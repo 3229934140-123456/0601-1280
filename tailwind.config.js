@@ -1,0 +1,101 @@
+/** @type {import('tailwindcss').Config} */
+
+export default {
+  darkMode: "class",
+  content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
+  theme: {
+    container: {
+      center: true,
+    },
+    extend: {
+      colors: {
+        primary: {
+          50: "#E8F5E9",
+          100: "#C8E6C9",
+          200: "#A5D6A7",
+          300: "#81C784",
+          400: "#66BB6A",
+          500: "#4CAF50",
+          600: "#43A047",
+          700: "#388E3C",
+          800: "#2E7D32",
+          900: "#1B5E20",
+        },
+        tech: {
+          50: "#E1F5FE",
+          100: "#B3E5FC",
+          200: "#81D4FA",
+          300: "#4FC3F7",
+          400: "#29B6F6",
+          500: "#03A9F4",
+          600: "#039BE5",
+          700: "#0288D1",
+          800: "#0277BD",
+          900: "#01579B",
+        },
+        warning: {
+          50: "#FFF3E0",
+          100: "#FFE0B2",
+          200: "#FFCC80",
+          300: "#FFB74D",
+          400: "#FFA726",
+          500: "#FF9800",
+          600: "#FB8C00",
+          700: "#F57C00",
+          800: "#EF6C00",
+          900: "#E65100",
+        },
+        danger: {
+          50: "#FFEBEE",
+          100: "#FFCDD2",
+          200: "#EF9A9A",
+          300: "#E57373",
+          400: "#EF5350",
+          500: "#F44336",
+          600: "#E53935",
+          700: "#D32F2F",
+          800: "#C62828",
+          900: "#B71C1C",
+        },
+        dark: {
+          50: "#ECEFF1",
+          100: "#CFD8DC",
+          200: "#B0BEC5",
+          300: "#90A4AE",
+          400: "#78909C",
+          500: "#607D8B",
+          600: "#546E7A",
+          700: "#455A64",
+          800: "#37474F",
+          900: "#263238",
+          950: "#1A2329",
+          980: "#0F1419",
+        },
+      },
+      fontFamily: {
+        mono: ["JetBrains Mono", "Consolas", "Monaco", "monospace"],
+      },
+      animation: {
+        "pulse-slow": "pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+        "breathe": "breathe 2s ease-in-out infinite",
+        "float": "float 6s ease-in-out infinite",
+        "glow": "glow 2s ease-in-out infinite alternate",
+      },
+      keyframes: {
+        breathe: {
+          "0%, 100%": { opacity: "1", transform: "scale(1)" },
+          "50%": { opacity: "0.7", transform: "scale(1.05)" },
+        },
+        float: {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-10px)" },
+        },
+        glow: {
+          "0%": { boxShadow: "0 0 5px rgba(76, 175, 80, 0.5)" },
+          "100%": { boxShadow: "0 0 20px rgba(76, 175, 80, 0.8)" },
+        },
+      },
+    },
+  },
+  plugins: [],
+};

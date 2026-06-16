@@ -1,0 +1,145 @@
+import type { WorkReport, DashboardStats } from '../types/report';
+
+export const mockReports: WorkReport[] = [
+  {
+    id: 'rpt001',
+    applicationId: 'app005',
+    taskId: 'task005',
+    plotName: '东河村5号田',
+    farmerName: '孙农户',
+    droneIds: ['d001'],
+    droneNames: ['植保-001'],
+    pilotNames: ['陈飞手'],
+    startTime: '2025-06-10 08:30:00',
+    endTime: '2025-06-10 10:45:00',
+    actualArea: 60,
+    flightDuration: 135,
+    totalSprayVolume: 90,
+    pesticideUsage: [
+      { name: '三环唑', amount: 2.1, unit: 'kg' },
+    ],
+    effectEvaluation: '作业效果良好，稻瘟病得到有效控制，预计防治效果达90%以上',
+    settlement: {
+      id: 'set001',
+      totalCost: 2880,
+      pesticideCost: 1960,
+      serviceCost: 920,
+      discount: 0,
+      actualPayment: 2880,
+      status: 'paid',
+    },
+    status: 'confirmed',
+    region: '华东区',
+    cropType: '水稻',
+  },
+  {
+    id: 'rpt002',
+    applicationId: 'app007',
+    taskId: 'task007',
+    plotName: '北庄村7号田',
+    farmerName: '马农户',
+    droneIds: ['d003'],
+    droneNames: ['植保-003'],
+    pilotNames: ['周飞手'],
+    startTime: '2025-06-08 09:00:00',
+    endTime: '2025-06-08 11:30:00',
+    actualArea: 45,
+    flightDuration: 150,
+    totalSprayVolume: 67.5,
+    pesticideUsage: [
+      { name: '吡虫啉', amount: 1.35, unit: 'kg' },
+      { name: '多菌灵', amount: 2.25, unit: 'kg' },
+    ],
+    effectEvaluation: '蚜虫防治效果显著，小麦生长恢复正常',
+    settlement: {
+      id: 'set002',
+      totalCost: 2350,
+      pesticideCost: 1680,
+      serviceCost: 670,
+      discount: 0,
+      actualPayment: 2350,
+      status: 'paid',
+    },
+    status: 'confirmed',
+    region: '华北区',
+    cropType: '小麦',
+  },
+  {
+    id: 'rpt003',
+    applicationId: 'app008',
+    taskId: 'task008',
+    plotName: '南湖村8号田',
+    farmerName: '朱农户',
+    droneIds: ['d002'],
+    droneNames: ['植保-002'],
+    pilotNames: ['刘飞手'],
+    startTime: '2025-06-05 07:30:00',
+    endTime: '2025-06-05 09:00:00',
+    actualArea: 35,
+    flightDuration: 90,
+    totalSprayVolume: 42,
+    pesticideUsage: [
+      { name: '草甘膦', quantity: 7, unit: 'L' } as any,
+    ].map((x: any) => ({ name: x.name, amount: x.quantity || x.amount, unit: x.unit })),
+    effectEvaluation: '杂草清除率达95%以上，作业质量优良',
+    settlement: {
+      id: 'set003',
+      totalCost: 1280,
+      pesticideCost: 840,
+      serviceCost: 440,
+      discount: 50,
+      actualPayment: 1230,
+      status: 'paid',
+    },
+    status: 'confirmed',
+    region: '华东区',
+    cropType: '玉米',
+  },
+];
+
+export const mockDashboardStats: DashboardStats = {
+  todayArea: 328.5,
+  totalDrones: 8,
+  activeDrones: 5,
+  inventoryTurnover: 4.8,
+  envAlertsCount: 4,
+  farmerSatisfaction: 92.5,
+  pendingApplications: 12,
+  completedToday: 8,
+};
+
+export const weeklyAreaData = [
+  { day: '周一', area: 280 },
+  { day: '周二', area: 320 },
+  { day: '周三', area: 295 },
+  { day: '周四', area: 350 },
+  { day: '周五', area: 310 },
+  { day: '周六', area: 285 },
+  { day: '周日', area: 328.5 },
+];
+
+export const monthlyEnvAlertData = [
+  { month: '1月', alerts: 12 },
+  { month: '2月', alerts: 8 },
+  { month: '3月', alerts: 15 },
+  { month: '4月', alerts: 22 },
+  { month: '5月', alerts: 18 },
+  { month: '6月', alerts: 25 },
+];
+
+export const cropDistribution = [
+  { name: '水稻', value: 35 },
+  { name: '小麦', value: 25 },
+  { name: '玉米', value: 20 },
+  { name: '大豆', value: 10 },
+  { name: '蔬菜', value: 7 },
+  { name: '其他', value: 3 },
+];
+
+export const regionData = [
+  { name: '华东区', area: 1280, drones: 3, alerts: 2 },
+  { name: '华北区', area: 960, drones: 2, alerts: 2 },
+  { name: '华南区', area: 720, drones: 1, alerts: 0 },
+  { name: '西南区', area: 540, drones: 1, alerts: 0 },
+  { name: '西北区', area: 420, drones: 1, alerts: 0 },
+];
