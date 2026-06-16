@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ArrowLeft, CheckCircle, XCircle, Clock, AlertTriangle, TrendingUp } from 'lucide-react';
 import { Button, Table, Tag, Modal, Form, Input, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { mockPurchaseOrders } from '../../mock/inventory';
 import type { PurchaseOrder } from '../../types/inventory';
+import { useInventoryStore } from '../../store/useInventoryStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useNavigate } from 'react-router-dom';
 
@@ -12,27 +12,49 @@ const { TextArea } = Input;
 const PurchaseApprovals = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
+  const { purchaseOrders, approvePurchase, rejectPurchase, canApprovePurchase } = useInventoryStore();
   const [selectedOrder, setSelectedOrder] = useState<PurchaseOrder | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form] = Form.useForm();
   const [approving, setApproving] = useState(false);
+  const [orders, setOrders] = useState<PurchaseOrder[]>([]);
 
-  const canApprove = (order: PurchaseOrder) => {
-    if (user?.role === 'supervisor' && order.currentLevel === 1) return true;
-    if (user?.role === 'supervisor' && order.currentLevel === 2) return true;
-    if (user?.role === 'admin' && order.currentLevel === 3) return true;
-    if (user?.role === 'admin') return true;
-    return false;
-  };
+  useEffect(() => {
+    setOrders(purchaseOrders);
+  }, [purchaseOrders]);
 
   const handleApprove = () => {
+    if (!selectedOrder) return;
     setApproving(true);
-    setTimeout(() => {
-      setApproving(false);
-      message.success('审批通过');
-      setIsModalOpen(false);
-      form.resetFields();
-    }, 1000);
+    form.validateFields().then((values) => {
+      const success = approvePurchase(selectedOrder.id, values.opinion || '');
+      setTimeout(() => {
+        setApproving(false);
+        if (success) {
+          message.success('审批通过');
+          setIsModalOpen(false);
+          form.resetFields();
+          setSelectedOrder(null);
+        } else {
+          message.error('审批失败，请检查权限');
+        }
+      }, 800);
+    });
+  };
+
+  const handleReject = () => {
+    if (!selectedOrder) return;
+    form.validateFields().then((values) => {
+      const success = rejectPurchase(selectedOrder.id, values.opinion || '');
+      if (success) {
+        message.warning('已驳回申请');
+        setIsModalOpen(false);
+        form.resetFields();
+        setSelectedOrder(null);
+      } else {
+        message.error('操作失败，请检查权限');
+      }
+    });
   };
 
   const columns: ColumnsType<PurchaseOrder> = [
@@ -112,12 +134,17 @@ const PurchaseApprovals = () => {
             setSelectedOrder(record);
             setIsModalOpen(true);
           }}
+          disabled={record.status !== 'pending'}
         >
-          {canApprove(record) ? '审批' : '查看'}
+          {record.status === 'pending' && canApprovePurchase(record) ? '审批' : '查看'}
         </Button>
       ),
     },
   ];
+
+  const pendingCount = orders.filter((o) => o.status === 'pending').length;
+  const approvedCount = orders.filter((o) => o.status === 'approved').length;
+  const escalatedCount = orders.filter((o) => o.escalatedAt).length;
 
   return (
     <div className="space-y-6">
@@ -136,9 +163,7 @@ const PurchaseApprovals = () => {
           <div className="flex items-center gap-3">
             <Clock size={20} className="text-warning-400" />
             <div>
-              <div className="text-2xl font-bold text-white font-mono">
-                {mockPurchaseOrders.filter((o) => o.status === 'pending').length}
-              </div>
+              <div className="text-2xl font-bold text-white font-mono">{pendingCount}</div>
               <div className="text-dark-400 text-sm">待审批</div>
             </div>
           </div>
@@ -147,9 +172,7 @@ const PurchaseApprovals = () => {
           <div className="flex items-center gap-3">
             <CheckCircle size={20} className="text-primary-400" />
             <div>
-              <div className="text-2xl font-bold text-white font-mono">
-                {mockPurchaseOrders.filter((o) => o.status === 'approved').length}
-              </div>
+              <div className="text-2xl font-bold text-white font-mono">{approvedCount}</div>
               <div className="text-dark-400 text-sm">已通过</div>
             </div>
           </div>
@@ -158,7 +181,7 @@ const PurchaseApprovals = () => {
           <div className="flex items-center gap-3">
             <TrendingUp size={20} className="text-tech-400" />
             <div>
-              <div className="text-2xl font-bold text-white font-mono">1</div>
+              <div className="text-2xl font-bold text-white font-mono">{escalatedCount}</div>
               <div className="text-dark-400 text-sm">已升级</div>
             </div>
           </div>
@@ -177,7 +200,7 @@ const PurchaseApprovals = () => {
       <div className="card-glow p-5">
         <Table
           columns={columns}
-          dataSource={mockPurchaseOrders}
+          dataSource={orders}
           rowKey="id"
           pagination={{ pageSize: 10 }}
         />
@@ -186,12 +209,15 @@ const PurchaseApprovals = () => {
       <Modal
         title="采购审批详情"
         open={isModalOpen}
-        onCancel={() => setIsModalOpen(false)}
+        onCancel={() => {
+          setIsModalOpen(false);
+          form.resetFields();
+        }}
         width={600}
         footer={
-          canApprove(selectedOrder!) ? (
+          selectedOrder && selectedOrder.status === 'pending' && canApprovePurchase(selectedOrder) ? (
             <div className="flex justify-end gap-3">
-              <Button danger icon={<XCircle size={14} />}>
+              <Button danger icon={<XCircle size={14} />} onClick={handleReject}>
                 驳回
               </Button>
               <Button type="primary" icon={<CheckCircle size={14} />} loading={approving} onClick={handleApprove}>
@@ -276,7 +302,7 @@ const PurchaseApprovals = () => {
               </div>
             </div>
 
-            {canApprove(selectedOrder) && (
+            {selectedOrder.status === 'pending' && canApprovePurchase(selectedOrder) && (
               <Form form={form} layout="vertical">
                 <Form.Item label="审批意见" name="opinion">
                   <TextArea rows={3} placeholder="请输入审批意见（可选）" />

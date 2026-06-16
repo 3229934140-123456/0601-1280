@@ -15,36 +15,39 @@ import {
 } from 'lucide-react';
 import { Button, Card, Descriptions, Progress, Tabs } from 'antd';
 import ReactECharts from 'echarts-for-react';
-import { mockDrones } from '../../mock/drones';
-import { mockApplications } from '../../mock/applications';
+import { useDroneStore } from '../../store/useDroneStore';
+import { useApplicationStore } from '../../store/useApplicationStore';
 
 const DroneDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const drone = mockDrones.find((d) => d.id === id);
+  const { drones, getDroneById, refreshDroneData } = useDroneStore();
+  const { applications } = useApplicationStore();
+  const drone = getDroneById(id || '');
   const [isPlaying, setIsPlaying] = useState(false);
   const [droneState, setDroneState] = useState(drone);
 
   useEffect(() => {
+    const currentDrone = getDroneById(id || '');
+    setDroneState(currentDrone);
+  }, [id, drones, getDroneById]);
+
+  useEffect(() => {
     if (!isPlaying || drone?.status !== 'in_task') return;
     const interval = setInterval(() => {
-      setDroneState((prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          battery: Math.max(10, prev.battery - 0.5),
-          currentLiquid: Math.max(0, prev.currentLiquid - 0.1),
-        };
-      });
+      refreshDroneData();
+      setDroneState(getDroneById(id || ''));
     }, 1000);
     return () => clearInterval(interval);
-  }, [isPlaying, drone?.status]);
+  }, [isPlaying, drone?.status, id, refreshDroneData, getDroneById]);
 
   if (!drone) {
     return <div className="text-dark-400">无人机不存在</div>;
   }
 
-  const currentTask = mockApplications.find((a) => a.status === 'in_progress');
+  const currentTask = applications.find((a) => 
+    a.status === 'in_progress' && a.workPlan?.droneIds?.includes(drone.id)
+  );
 
   const flightPathOption = {
     backgroundColor: 'transparent',

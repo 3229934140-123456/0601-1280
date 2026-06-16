@@ -11,20 +11,17 @@ import {
   Download,
   Filter,
 } from 'lucide-react';
-import { Select, DatePicker, Button } from 'antd';
+import { Select, DatePicker, Button, message } from 'antd';
 import ReactECharts from 'echarts-for-react';
 import dayjs from 'dayjs';
 import StatCard from '../../components/StatCard/StatCard';
 import MapView from '../../components/MapView/MapView';
 import { useDashboardStore } from '../../store/useDashboardStore';
-import { mockApplications } from '../../mock/applications';
-import { mockEnvAlerts } from '../../mock/environment';
-import { mockDrones } from '../../mock/drones';
 
 const { RangePicker } = DatePicker;
 
 const Dashboard = () => {
-  const { stats, weeklyArea, monthlyAlerts, cropDist, regions, lastUpdate, refreshData, selectedRegion, selectedCrop, setFilters } =
+  const { filteredData, lastUpdate, refreshData, selectedRegion, selectedCrop, selectedDate, setFilters, exportMonthlyReport } =
     useDashboardStore();
   const [updating, setUpdating] = useState(false);
 
@@ -40,6 +37,13 @@ const Dashboard = () => {
     refreshData();
     setTimeout(() => setUpdating(false), 1000);
   };
+
+  const handleExport = () => {
+    exportMonthlyReport();
+    message.success('报告导出中，请稍候...');
+  };
+
+  const { stats, weeklyArea, monthlyAlerts, cropDist, regions, recentApplications, recentAlerts } = filteredData;
 
   const areaChartOption = {
     backgroundColor: 'transparent',
@@ -166,15 +170,12 @@ const Dashboard = () => {
           value: d.value,
           name: d.name,
           itemStyle: {
-            color: ['#4CAF50', '#03A9F4', '#FF9800', '#9C27B0', '#00BCD4', '#795548'][i],
+            color: ['#4CAF50', '#03A9F4', '#FF9800', '#9C27B0', '#00BCD4', '#795548'][i % 6],
           },
         })),
       },
     ],
   };
-
-  const recentApplications = mockApplications.slice(0, 5);
-  const recentAlerts = mockEnvAlerts.slice(0, 4);
 
   return (
     <div className="space-y-6">
@@ -190,7 +191,7 @@ const Dashboard = () => {
             <Filter size={16} className="text-dark-400" />
             <Select
               value={selectedRegion}
-              onChange={(v) => setFilters(v, selectedCrop, '今日')}
+              onChange={(v) => setFilters(v, selectedCrop, selectedDate)}
               style={{ width: 120 }}
               options={[
                 { value: '全部', label: '全部区域' },
@@ -203,7 +204,7 @@ const Dashboard = () => {
             />
             <Select
               value={selectedCrop}
-              onChange={(v) => setFilters(selectedRegion, v, '今日')}
+              onChange={(v) => setFilters(selectedRegion, v, selectedDate)}
               style={{ width: 120 }}
               options={[
                 { value: '全部', label: '全部作物' },
@@ -213,8 +214,19 @@ const Dashboard = () => {
                 { value: '大豆', label: '大豆' },
               ]}
             />
+            <Select
+              value={selectedDate}
+              onChange={(v) => setFilters(selectedRegion, selectedCrop, v)}
+              style={{ width: 120 }}
+              options={[
+                { value: '今日', label: '今日' },
+                { value: '本周', label: '本周' },
+                { value: '本月', label: '本月' },
+                { value: '本季度', label: '本季度' },
+              ]}
+            />
           </div>
-          <Button icon={<Download size={16} />} className="bg-dark-800 border-dark-600 text-dark-200 hover:text-white">
+          <Button icon={<Download size={16} />} onClick={handleExport} className="bg-dark-800 border-dark-600 text-dark-200 hover:text-white">
             导出报告
           </Button>
           <Button

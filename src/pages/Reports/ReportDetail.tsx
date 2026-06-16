@@ -8,18 +8,38 @@ import {
   MapPin,
   Download,
   CheckCircle,
+  Lock,
 } from 'lucide-react';
-import { Button, Card, Descriptions, Divider, Tag, List, Progress } from 'antd';
+import { Button, Card, Descriptions, Divider, Tag, List, Progress, Result } from 'antd';
 import ReactECharts from 'echarts-for-react';
 import { mockReports } from '../../mock/reports';
+import { useAuthStore } from '../../store/useAuthStore';
 
 const ReportDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuthStore();
   const report = mockReports.find((r) => r.id === id);
 
   if (!report) {
     return <div className="text-dark-400">报告不存在</div>;
+  }
+
+  if (user?.role === 'farmer' && report.farmerId !== user.id && report.farmerName !== user.name) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Result
+          icon={<Lock size={48} className="text-warning-500" />}
+          title="无权限访问"
+          subTitle="您只能查看自己的报告详情"
+          extra={
+            <Button type="primary" onClick={() => navigate('/reports')}>
+              返回报告列表
+            </Button>
+          }
+        />
+      </div>
+    );
   }
 
   const sprayChartOption = {

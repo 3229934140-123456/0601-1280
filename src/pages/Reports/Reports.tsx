@@ -1,22 +1,38 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FileText, Search, Filter, Download, Calendar } from 'lucide-react';
-import { Input, Select, Button, Table, Tag, DatePicker } from 'antd';
+import { Input, Select, Button, Table, Tag, DatePicker, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { mockReports } from '../../mock/reports';
 import type { WorkReport } from '../../types/report';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useDashboardStore } from '../../store/useDashboardStore';
 
 const { RangePicker } = DatePicker;
 
 const Reports = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
+  const { getFilteredReports, exportMonthlyReport } = useDashboardStore();
   const [keyword, setKeyword] = useState('');
   const [status, setStatus] = useState<string>('all');
   const [crop, setCrop] = useState<string>('all');
+  const [reports, setReports] = useState<WorkReport[]>(mockReports);
 
-  const filteredData = mockReports.filter((r) => {
+  useEffect(() => {
+    const filtered = getFilteredReports();
+    setReports(filtered);
+  }, [getFilteredReports]);
+
+  const handleViewDetail = (record: WorkReport) => {
+    if (user?.role === 'farmer' && record.farmerId !== user.id && record.farmerName !== user.name) {
+      message.error('您只能查看自己的报告详情');
+      return;
+    }
+    navigate(`/reports/${record.id}`);
+  };
+
+  const filteredData = reports.filter((r) => {
     if (keyword && !r.plotName.includes(keyword) && !r.farmerName.includes(keyword)) return false;
     if (status !== 'all' && r.status !== status) return false;
     if (crop !== 'all' && r.cropType !== crop) return false;
@@ -36,7 +52,7 @@ const Reports = () => {
       dataIndex: 'plotName',
       key: 'plotName',
       render: (text, record) => (
-        <a onClick={() => navigate(`/reports/${record.id}`)} className="text-dark-100 hover:text-primary-400">
+        <a onClick={() => handleViewDetail(record)} className="text-dark-100 hover:text-primary-400">
           {text}
         </a>
       ),
@@ -96,7 +112,7 @@ const Reports = () => {
       width: 150,
       render: (_, record) => (
         <>
-          <Button type="link" size="small" onClick={() => navigate(`/reports/${record.id}`)}>
+          <Button type="link" size="small" onClick={() => handleViewDetail(record)}>
             详情
           </Button>
           <Button type="link" size="small" icon={<Download size={12} />}>
@@ -114,7 +130,7 @@ const Reports = () => {
           <FileText className="text-primary-400" size={24} />
           作业报告
         </h2>
-        <Button icon={<Download size={16} />} type="primary">
+        <Button icon={<Download size={16} />} type="primary" onClick={exportMonthlyReport}>
           导出月度报告
         </Button>
       </div>

@@ -1,18 +1,23 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ArrowLeft, AlertTriangle, Lock, Unlock, FileText, CheckCircle, Clock } from 'lucide-react';
 import { Button, Table, Tag, Modal, message, Tabs } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { mockEnvAlerts, mockRectificationOrders } from '../../mock/environment';
 import type { EnvAlert, RectificationOrder } from '../../types/environment';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useEnvironmentStore } from '../../store/useEnvironmentStore';
 
 const EnvAlerts = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  const [alerts, setAlerts] = useState(mockEnvAlerts);
+  const { alerts, rectificationOrders, lockedPlots, getAlerts, getOrders, processAlert, lockPlot, createRectificationOrder, approveRectificationOrder } = useEnvironmentStore();
   const [selectedAlert, setSelectedAlert] = useState<EnvAlert | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  useEffect(() => {
+    getAlerts();
+    getOrders();
+  }, [getAlerts, getOrders]);
 
   const handleProcess = (alert: EnvAlert) => {
     setSelectedAlert(alert);
@@ -20,15 +25,30 @@ const EnvAlerts = () => {
   };
 
   const handleLockPlot = () => {
-    message.success('地块已锁定，作业已暂停，整改工单已推送');
-    setIsModalOpen(false);
-    setAlerts((prev) =>
-      prev.map((a) => (a.id === selectedAlert?.id ? { ...a, status: 'processing' } : a))
-    );
+    if (!selectedAlert) return;
+    
+    const success = lockPlot(selectedAlert.plotId, selectedAlert.indicator + '超标');
+    if (success) {
+      const order = createRectificationOrder(
+        selectedAlert.id,
+        selectedAlert.plotId,
+        `${selectedAlert.type === 'water' ? '水质' : '土壤'}中${selectedAlert.indicator}含量超标`,
+        '立即停止作业，7日内提交整改方案并完成整改'
+      );
+      if (order) {
+        message.success('地块已锁定，作业已暂停，整改工单已推送');
+        setIsModalOpen(false);
+      }
+    }
   };
 
   const handleResolve = (orderId: string) => {
-    message.success('整改已审核通过，地块已解锁');
+    const success = approveRectificationOrder(orderId);
+    if (success) {
+      message.success('整改已审核通过，地块已解锁');
+    } else {
+      message.error('审核失败，请检查权限');
+    }
   };
 
   const alertColumns: ColumnsType<EnvAlert> = [
@@ -104,12 +124,32 @@ const EnvAlerts = () => {
       width: 150,
       render: (_, record) => (
         <>
-          <Button type="link" size="small" onClick={() => handleProcess(record)}>
-            处理
-          </Button>
-          <Button type="link" size="small" danger>
-            锁定地块
-          </Button>
+          {record.status === 'pending' && (
+            <Button type="link" size="small" onClick={() => handleProcess(record)}>
+              处理
+            </Button>
+          )}
+          {record.status !== 'resolved' && (
+            <Button 
+              type="link" 
+              size="small" 
+              danger
+              onClick={() => {
+                const success = lockPlot(record.plotId, record.indicator + '超标');
+                if (success) {
+                  createRectificationOrder(
+                    record.id,
+                    record.plotId,
+                    `${record.type === 'water' ? '水质' : '土壤'}中${record.indicator}含量超标`,
+                    '立即停止作业，7日内提交整改方案并完成整改'
+                  );
+                  message.success('地块已锁定，整改工单已生成');
+                }
+              }}
+            >
+              锁定地块
+            </Button>
+          )}
         </>
       ),
     },
@@ -212,7 +252,7 @@ const EnvAlerts = () => {
       children: (
         <Table
           columns={rectificationColumns}
-          dataSource={mockRectificationOrders}
+          dataSource={rectificationOrders}
           rowKey="id"
           pagination={{ pageSize: 10 }}
         />
@@ -259,7 +299,7 @@ const EnvAlerts = () => {
           <div className="flex items-center gap-3">
             <Lock size={20} className="text-warning-400" />
             <div>
-              <div className="text-2xl font-bold text-white font-mono">1</div>
+              <div className="text-2xl font-bold text-white font-mono">{lockedPlots.length}</div>
               <div className="text-dark-400 text-sm">已锁定地块</div>
             </div>
           </div>

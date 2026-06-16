@@ -13,6 +13,7 @@ export interface WorkReport {
   applicationId: string;
   taskId: string;
   plotName: string;
+  farmerId: string;
   farmerName: string;
   droneIds: string[];
   droneNames: string[];

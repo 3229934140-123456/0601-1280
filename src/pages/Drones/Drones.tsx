@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plane, Battery, Droplets, MapPin, AlertTriangle, Search } from 'lucide-react';
-import { Input, Select, Tabs, Table, Tag, Badge } from 'antd';
+import { Plane, Battery, Droplets, MapPin, AlertTriangle, Search, RotateCcw } from 'lucide-react';
+import { Input, Select, Tabs, Table, Tag, Badge, message, Modal, Button } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { mockDrones, mockDroneAlerts } from '../../mock/drones';
-import type { Drone, DroneStatus } from '../../types/drone';
+import type { Drone, DroneStatus, DroneAlert } from '../../types/drone';
+import { useDroneStore } from '../../store/useDroneStore';
+import { useAuthStore } from '../../store/useAuthStore';
 
 const statusMap: Record<DroneStatus, { text: string; color: string; dot: string }> = {
   idle: { text: '待命', color: 'success', dot: 'bg-primary-500' },
@@ -16,30 +17,21 @@ const statusMap: Record<DroneStatus, { text: string; color: string; dot: string 
 
 const Drones = () => {
   const navigate = useNavigate();
+  const { user } = useAuthStore();
+  const { drones, alerts, backupDispatches, getDrones, getAlerts, refreshDroneData, handleAlertWithBackup, resolveAlert } = useDroneStore();
   const [keyword, setKeyword] = useState('');
   const [status, setStatus] = useState<string>('all');
-  const [drones, setDrones] = useState(mockDrones);
+  const [selectedAlert, setSelectedAlert] = useState<DroneAlert | null>(null);
+  const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
 
   useEffect(() => {
+    getDrones();
+    getAlerts();
     const interval = setInterval(() => {
-      setDrones((prev) =>
-        prev.map((d) => ({
-          ...d,
-          battery:
-            d.status === 'in_task'
-              ? Math.max(10, d.battery - Math.random() * 2)
-              : d.status === 'charging'
-              ? Math.min(100, d.battery + Math.random() * 3)
-              : d.battery,
-          currentLiquid:
-            d.status === 'in_task'
-              ? Math.max(0, d.currentLiquid - Math.random() * 0.5)
-              : d.currentLiquid,
-        }))
-      );
+      refreshDroneData();
     }, 3000);
     return () => clearInterval(interval);
-  }, []);
+  }, [getDrones, getAlerts, refreshDroneData]);
 
   const filteredDrones = drones.filter((d) => {
     if (keyword && !d.name.includes(keyword)) return false;
@@ -49,7 +41,23 @@ const Drones = () => {
 
   const activeCount = drones.filter((d) => d.status === 'in_task').length;
   const idleCount = drones.filter((d) => d.status === 'idle').length;
-  const alertCount = mockDroneAlerts.filter((a) => !a.resolved).length;
+  const alertCount = alerts.filter((a) => !a.resolved).length;
+
+  const handleProcessAlert = (alert: DroneAlert) => {
+    setSelectedAlert(alert);
+    setIsBackupModalOpen(true);
+  };
+
+  const handleDispatchBackup = () => {
+    if (!selectedAlert) return;
+    const dispatch = handleAlertWithBackup(selectedAlert.id);
+    if (dispatch) {
+      message.success(`已调度备用机 ${dispatch.backupDroneName} 前往 ${dispatch.plotName}`);
+      setIsBackupModalOpen(false);
+    } else {
+      message.error('暂无可用备用无人机');
+    }
+  };
 
   const columns: ColumnsType<Drone> = [
     {
@@ -150,7 +158,7 @@ const Drones = () => {
       ),
       children: (
         <div className="space-y-3">
-          {mockDroneAlerts.map((alert) => (
+          {alerts.map((alert) => (
             <div
               key={alert.id}
               className={`p-4 rounded-lg border ${
@@ -181,12 +189,56 @@ const Drones = () => {
               </div>
               <p className="text-dark-300 text-sm">{alert.message}</p>
               {!alert.resolved && (
-                <div className="mt-3 flex justify-end">
-                  <a className="text-tech-400 text-sm hover:text-tech-300">处理告警 →</a>
+                <div className="mt-3 flex justify-end gap-2">
+                  <Button 
+                    type="link" 
+                    size="small" 
+                    onClick={() => handleProcessAlert(alert)}
+                    className="text-tech-400 hover:text-tech-300"
+                  >
+                    处理并调度备用机 →
+                  </Button>
+                  <Button 
+                    type="link" 
+                    size="small" 
+                    danger
+                    onClick={() => {
+                      resolveAlert(alert.id);
+                      message.success('告警已标记为已处理');
+                    }}
+                  >
+                    忽略告警
+                  </Button>
                 </div>
               )}
             </div>
           ))}
+          {backupDispatches.length > 0 && (
+            <div className="mt-6">
+              <h4 className="text-white font-medium mb-3">备用机调度记录</h4>
+              <div className="space-y-2">
+                {backupDispatches.slice(0, 5).map((dispatch) => (
+                  <div 
+                    key={dispatch.id} 
+                    className="p-3 bg-dark-950/50 rounded-lg border border-dark-700"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <RotateCcw size={14} className="text-tech-400" />
+                        <span className="text-dark-200 text-sm">
+                          {dispatch.originalDroneName} → {dispatch.backupDroneName}
+                        </span>
+                      </div>
+                      <Tag color="processing">已调度</Tag>
+                    </div>
+                    <p className="text-dark-400 text-xs mt-1">
+                      {dispatch.plotName} · {dispatch.dispatchedAt}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       ),
     },
@@ -272,6 +324,51 @@ const Drones = () => {
 
         <Tabs items={tabItems} defaultActiveKey="list" />
       </div>
+
+      <Modal
+        title="处理告警并调度备用机"
+        open={isBackupModalOpen}
+        onCancel={() => setIsBackupModalOpen(false)}
+        width={500}
+        footer={
+          <div className="flex justify-end gap-3">
+            <Button onClick={() => setIsBackupModalOpen(false)}>取消</Button>
+            <Button type="primary" onClick={handleDispatchBackup}>
+              确认调度备用机
+            </Button>
+          </div>
+        }
+      >
+        {selectedAlert && (
+          <div className="space-y-4">
+            <div className="bg-warning-500/10 border border-warning-500/30 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <AlertTriangle size={20} className="text-warning-500" />
+                <span className="text-white font-semibold">{selectedAlert.droneName}</span>
+                <Tag color="warning">
+                  {{
+                    route_deviation: '航线偏移',
+                    low_liquid: '药液不足',
+                    low_battery: '电量低',
+                    equipment_fault: '设备故障',
+                  }[selectedAlert.type]}
+                </Tag>
+              </div>
+              <p className="text-dark-300 text-sm">{selectedAlert.message}</p>
+            </div>
+
+            <div className="bg-dark-950 rounded-lg p-4">
+              <h4 className="text-dark-200 font-medium mb-2">调度说明</h4>
+              <ul className="text-dark-400 text-sm space-y-1 list-disc pl-5">
+                <li>系统将自动选择同区域空闲的无人机作为备用机</li>
+                <li>原无人机将转为维护状态进行检修</li>
+                <li>备用机将继承原作业任务和飞手分配</li>
+                <li>调度记录将自动保存至调度日志</li>
+              </ul>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };

@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Send, MapPin, Sprout, Bug, Calendar } from 'lucide-react';
 import { Button, Form, Input, Select, InputNumber, DatePicker, message, Card } from 'antd';
 import { cropTypes, pestTypes, regions } from '../../mock/applications';
+import { useApplicationStore } from '../../store/useApplicationStore';
+import { useAuthStore } from '../../store/useAuthStore';
 import dayjs from 'dayjs';
 
 const { TextArea } = Input;
@@ -10,15 +12,39 @@ const { Option } = Select;
 
 const NewApplication = () => {
   const navigate = useNavigate();
+  const { user } = useAuthStore();
+  const { createApplication } = useApplicationStore();
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
 
   const onFinish = (values: any) => {
+    if (!user || user.role !== 'farmer') {
+      message.error('只有农户可以提交植保申请');
+      return;
+    }
+
     setSubmitting(true);
+    
+    const newApp = createApplication({
+      plotName: values.plotName,
+      plotArea: values.plotArea,
+      cropType: values.cropType,
+      cropStage: values.cropStage,
+      pestType: Array.isArray(values.pestType) ? values.pestType.join('+') : values.pestType,
+      pestLevel: values.pestLevel,
+      requirement: values.requirement || '',
+      expectedDate: values.expectedDate.format('YYYY-MM-DD'),
+      region: values.region,
+    });
+
     setTimeout(() => {
       setSubmitting(false);
-      message.success('申请提交成功，等待系统制定作业方案');
-      navigate('/applications');
+      if (newApp) {
+        message.success('申请提交成功，系统已自动生成作业方案');
+        navigate('/applications');
+      } else {
+        message.error('申请提交失败，请重试');
+      }
     }, 1000);
   };
 
@@ -38,6 +64,7 @@ const NewApplication = () => {
           onFinish={onFinish}
           initialValues={{
             expectedDate: dayjs().add(3, 'day'),
+            region: user?.region || regions[0],
           }}
         >
           <div className="mb-6">
@@ -116,7 +143,7 @@ const NewApplication = () => {
                 name="pestType"
                 rules={[{ required: true, message: '请选择病虫害类型' }]}
               >
-                <Select placeholder="请选择病虫害类型" size="large" mode="tags">
+                <Select placeholder="请选择病虫害类型" size="large">
                   {pestTypes.map((p) => (
                     <Option key={p} value={p}>
                       {p}

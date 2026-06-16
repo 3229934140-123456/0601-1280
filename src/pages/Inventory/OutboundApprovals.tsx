@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ArrowLeft, CheckCircle, XCircle, Clock, Package, AlertTriangle } from 'lucide-react';
 import { Button, Table, Tag, Modal, Form, Input, message, Card, Descriptions, List } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { mockOutboundOrders } from '../../mock/inventory';
 import type { OutboundOrder } from '../../types/inventory';
+import { useInventoryStore } from '../../store/useInventoryStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useNavigate } from 'react-router-dom';
 
@@ -12,33 +12,48 @@ const { TextArea } = Input;
 const OutboundApprovals = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
+  const { outboundOrders, approveOutbound, rejectOutbound, canApproveOutbound } = useInventoryStore();
   const [selectedOrder, setSelectedOrder] = useState<OutboundOrder | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form] = Form.useForm();
   const [approving, setApproving] = useState(false);
+  const [orders, setOrders] = useState<OutboundOrder[]>([]);
 
-  const canApprove = (order: OutboundOrder) => {
-    if (user?.role === 'supervisor' && order.currentLevel === 1) return true;
-    if (user?.role === 'env_officer' && order.currentLevel === 2) return true;
-    if (user?.role === 'admin') return true;
-    return false;
-  };
+  useEffect(() => {
+    setOrders(outboundOrders);
+  }, [outboundOrders]);
 
   const handleApprove = () => {
+    if (!selectedOrder) return;
     setApproving(true);
-    setTimeout(() => {
-      setApproving(false);
-      message.success('审批通过');
-      setIsModalOpen(false);
-      form.resetFields();
-    }, 1000);
+    form.validateFields().then((values) => {
+      const success = approveOutbound(selectedOrder.id, values.opinion || '');
+      setTimeout(() => {
+        setApproving(false);
+        if (success) {
+          message.success('审批通过');
+          setIsModalOpen(false);
+          form.resetFields();
+          setSelectedOrder(null);
+        } else {
+          message.error('审批失败，请检查权限');
+        }
+      }, 800);
+    });
   };
 
   const handleReject = () => {
-    form.validateFields().then(() => {
-      message.warning('已驳回申请');
-      setIsModalOpen(false);
-      form.resetFields();
+    if (!selectedOrder) return;
+    form.validateFields().then((values) => {
+      const success = rejectOutbound(selectedOrder.id, values.opinion || '');
+      if (success) {
+        message.warning('已驳回申请');
+        setIsModalOpen(false);
+        form.resetFields();
+        setSelectedOrder(null);
+      } else {
+        message.error('操作失败，请检查权限');
+      }
     });
   };
 
@@ -112,13 +127,17 @@ const OutboundApprovals = () => {
             setSelectedOrder(record);
             setIsModalOpen(true);
           }}
-          disabled={!canApprove(record)}
+          disabled={record.status !== 'pending'}
         >
-          {canApprove(record) ? '审批' : '查看'}
+          {record.status === 'pending' && canApproveOutbound(record) ? '审批' : '查看'}
         </Button>
       ),
     },
   ];
+
+  const pendingCount = orders.filter((o) => o.status === 'pending').length;
+  const approvedCount = orders.filter((o) => o.status === 'approved').length;
+  const escalatedCount = orders.filter((o) => o.status === 'escalated').length;
 
   return (
     <div className="space-y-6">
@@ -137,9 +156,7 @@ const OutboundApprovals = () => {
           <div className="flex items-center gap-3">
             <Clock size={20} className="text-warning-400" />
             <div>
-              <div className="text-2xl font-bold text-white font-mono">
-                {mockOutboundOrders.filter((o) => o.status === 'pending').length}
-              </div>
+              <div className="text-2xl font-bold text-white font-mono">{pendingCount}</div>
               <div className="text-dark-400 text-sm">待审批</div>
             </div>
           </div>
@@ -148,9 +165,7 @@ const OutboundApprovals = () => {
           <div className="flex items-center gap-3">
             <CheckCircle size={20} className="text-primary-400" />
             <div>
-              <div className="text-2xl font-bold text-white font-mono">
-                {mockOutboundOrders.filter((o) => o.status === 'approved').length}
-              </div>
+              <div className="text-2xl font-bold text-white font-mono">{approvedCount}</div>
               <div className="text-dark-400 text-sm">已通过</div>
             </div>
           </div>
@@ -159,8 +174,8 @@ const OutboundApprovals = () => {
           <div className="flex items-center gap-3">
             <AlertTriangle size={20} className="text-danger-400" />
             <div>
-              <div className="text-2xl font-bold text-white font-mono">1</div>
-              <div className="text-dark-400 text-sm">即将超时</div>
+              <div className="text-2xl font-bold text-white font-mono">{escalatedCount}</div>
+              <div className="text-dark-400 text-sm">已越级</div>
             </div>
           </div>
         </div>
@@ -169,7 +184,7 @@ const OutboundApprovals = () => {
       <div className="card-glow p-5">
         <Table
           columns={columns}
-          dataSource={mockOutboundOrders}
+          dataSource={orders}
           rowKey="id"
           pagination={{ pageSize: 10 }}
         />
@@ -178,10 +193,13 @@ const OutboundApprovals = () => {
       <Modal
         title="出库审批详情"
         open={isModalOpen}
-        onCancel={() => setIsModalOpen(false)}
+        onCancel={() => {
+          setIsModalOpen(false);
+          form.resetFields();
+        }}
         width={700}
         footer={
-          canApprove(selectedOrder!) ? (
+          selectedOrder && selectedOrder.status === 'pending' && canApproveOutbound(selectedOrder) ? (
             <div className="flex justify-end gap-3">
               <Button danger icon={<XCircle size={14} />} onClick={handleReject}>
                 驳回
@@ -255,7 +273,7 @@ const OutboundApprovals = () => {
               </div>
             </div>
 
-            {canApprove(selectedOrder) && (
+            {selectedOrder.status === 'pending' && canApproveOutbound(selectedOrder) && (
               <Form form={form} layout="vertical">
                 <Form.Item
                   label="审批意见"

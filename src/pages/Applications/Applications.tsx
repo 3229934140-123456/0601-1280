@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Filter, FileText } from 'lucide-react';
 import { Input, Select, Button, Table, Tag, Space } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { mockApplications, regions, cropTypes } from '../../mock/applications';
+import { regions, cropTypes } from '../../mock/applications';
 import type { Application, ApplicationStatus } from '../../types/application';
+import { useApplicationStore } from '../../store/useApplicationStore';
 import { useAuthStore } from '../../store/useAuthStore';
 
 const statusMap: Record<ApplicationStatus, { text: string; color: string }> = {
@@ -19,17 +20,22 @@ const statusMap: Record<ApplicationStatus, { text: string; color: string }> = {
 const Applications = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
+  const { getApplications } = useApplicationStore();
   const [keyword, setKeyword] = useState('');
   const [status, setStatus] = useState<string>('all');
   const [region, setRegion] = useState<string>('all');
   const [crop, setCrop] = useState<string>('all');
+  const [data, setData] = useState<Application[]>([]);
 
-  const filteredData = mockApplications.filter((app) => {
+  useEffect(() => {
+    setData(getApplications());
+  }, [getApplications]);
+
+  const filteredData = data.filter((app) => {
     if (keyword && !app.plotName.includes(keyword) && !app.farmerName.includes(keyword)) return false;
     if (status !== 'all' && app.status !== status) return false;
     if (region !== 'all' && app.region !== region) return false;
     if (crop !== 'all' && app.cropType !== crop) return false;
-    if (user?.role === 'farmer' && app.farmerId !== user.id) return false;
     return true;
   });
 
